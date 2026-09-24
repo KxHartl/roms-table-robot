@@ -14,5 +14,6 @@ upravljan iz aplikacije `RomsCatiaUI` preko `master.CATPart`.
 | `src/01_cad/07_schunk` | SCHUNK MPG-plus 40 i EGP 64 |
 | `src/02_vb` | aplikacija; build: `powershell -ExecutionPolicy Bypass -File .\build.ps1` |
 | `src/03_macros` | CATIA makroi za debugging i održavanje – vidi `00_README.md` |
+| `docs/NAPOMENE.md` | kako je sve povezano, zašto, postupci i zamke – pročitati prije izmjena |
 
 CAD datoteke premještati samo kroz CATIA (SaveAs / `30_reorganize_tree`), nikad u Exploreru.
