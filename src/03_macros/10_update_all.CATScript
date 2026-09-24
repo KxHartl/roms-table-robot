@@ -1,0 +1,48 @@
+' Update cijelog lanca: master -> svi dijelovi -> svi sklopovi -> aktivni dokument.
+' Prije toga ukljuci "Synchronize all external references for update"
+' (Tools > Options > Infrastructure > Part Infrastructure), bez cega promjena u
+' masteru ne dode do dijelova koji ga koriste. Nista ne sprema.
+Function CATMain()
+Dim s, c, i, d, t
+On Error Resume Next
+Set c = CATIA.SettingControllers.Item("CATMmuPartInfrastructureSettingCtrl")
+c.UpdateLinkedExternalReferences = True
+s = "sync external refs = " & c.UpdateLinkedExternalReferences & vbLf
+If Err.Number <> 0 Then
+ s = s & "  (postavka nije dostupna: " & Err.Description & ")" & vbLf
+ Err.Clear
+End If
+t = Timer
+CATIA.Documents.Item("master.CATPart").Part.Update
+If Err.Number <> 0 Then
+ s = s & "master update ERR " & Err.Description & vbLf
+ Err.Clear
+End If
+For i = 1 To CATIA.Documents.Count
+ Set d = CATIA.Documents.Item(i)
+ If LCase(Right(d.Name, 8)) = ".catpart" And d.Name <> "master.CATPart" Then
+  d.Part.Update
+  If Err.Number <> 0 Then
+   s = s & "update ERR " & d.Name & ": " & Err.Description & vbLf
+   Err.Clear
+  End If
+ End If
+Next
+For i = CATIA.Documents.Count To 1 Step -1
+ Set d = CATIA.Documents.Item(i)
+ If LCase(Right(d.Name, 11)) = ".catproduct" Then
+  d.Product.Update
+  If Err.Number <> 0 Then
+   s = s & "update ERR " & d.Name & ": " & Err.Description & vbLf
+   Err.Clear
+  End If
+ End If
+Next
+CATIA.ActiveDocument.Product.Update
+If Err.Number <> 0 Then
+ s = s & "update ERR aktivni: " & Err.Description & vbLf
+ Err.Clear
+End If
+s = s & "gotovo za " & FormatNumber(Timer - t, 1) & " s" & vbLf
+CATMain = s
+End Function

@@ -1,0 +1,51 @@
+' Usporedba svih "External Parameters\X" u otvorenim dijelovima s parametrom X u
+' master.CATPart. Razlika (!!) znaci da veza tog dijela na master ne radi pa je
+' vrijednost zamrznuta (npr. robot izgraden na staroj duljini segmenta).
+' Ostaci prekinutog 11_relink_external (X__old) se prijavljuju posebno.
+' Argument (opcionalno): filtar imena dokumenta, npr. "rb_" samo za robota.
+Function G(prm, n)
+On Error Resume Next
+Err.Clear
+G = prm.Item(n).ValueAsString
+If Err.Number <> 0 Then G = "(nema)"
+End Function
+
+Function CATMain(filt)
+Dim s, i, j, d, part, mp, p, nm, mv, lv, bad, ok, pre
+On Error Resume Next
+pre = "External Parameters\"
+Set mp = CATIA.Documents.Item("master.CATPart").Part.Parameters
+If Err.Number <> 0 Then
+ CATMain = "master.CATPart nije otvoren"
+ Exit Function
+End If
+s = "master: len_J2J3=" & G(mp, "len_J2J3") & " len_J3J5=" & G(mp, "len_J3J5") & vbLf
+bad = 0
+ok = 0
+For i = 1 To CATIA.Documents.Count
+ Set d = CATIA.Documents.Item(i)
+ If LCase(Right(d.Name, 8)) = ".catpart" And d.Name <> "master.CATPart" Then
+  If filt = "" Or InStr(LCase(d.Name), LCase(filt)) > 0 Then
+   Set part = d.Part
+   For j = 1 To part.Parameters.Count
+    Set p = part.Parameters.Item(j)
+    If Right(p.Name, 5) = "__old" Then
+     s = s & "?? " & d.Name & "  " & p.Name & " (ostatak 11_relink_external)" & vbLf
+    ElseIf InStr(p.Name, pre) > 0 Then
+     nm = Mid(p.Name, InStr(p.Name, pre) + Len(pre))
+     lv = p.ValueAsString
+     mv = G(mp, nm)
+     If lv <> mv Then
+      s = s & "!! " & d.Name & "  " & nm & "  dio=" & lv & "  master=" & mv & vbLf
+      bad = bad + 1
+     Else
+      ok = ok + 1
+     End If
+    End If
+   Next
+  End If
+ End If
+Next
+s = s & "OK=" & ok & "  RAZLIKA=" & bad & vbLf
+CATMain = s
+End Function

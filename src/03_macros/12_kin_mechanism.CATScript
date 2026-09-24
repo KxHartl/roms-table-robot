@@ -1,0 +1,54 @@
+' Provjera DMU mehanizma robota (samo cita, nista ne mijenja):
+' ime, broj zglobova i komandi, DOF, svaka komanda s trenutnom vrijednoscu i
+' zglobom, svaki zglob, te zakoni (Laws) mehanizma s izrazima.
+' Mehanizam se NE brise kroz API (nesigurno); pojedini zglob se moze - vidi
+' MechanismRepair.vb. Argument: ime dokumenta, default robot_mainAssembly.CATProduct.
+Function CATMain(docName)
+Dim s, root, mechs, m, i, k, c, j, laws, rel, rels
+On Error Resume Next
+If docName = "" Then docName = "robot_mainAssembly.CATProduct"
+Set root = CATIA.Documents.Item(docName).Product
+If Err.Number <> 0 Then CATMain = docName & " nije otvoren" : Exit Function
+Set mechs = root.GetTechnologicalObject("Mechanisms")
+s = docName & ": mehanizama=" & mechs.Count & vbLf
+For k = 1 To mechs.Count
+ Set m = mechs.Item(k)
+ Err.Clear
+ s = s & "#" & k & " " & m.Name & "  joints=" & m.NbJoints & "  commands=" & m.NbCommands
+ s = s & "  DOF=" & m.NbDof
+ If Err.Number <> 0 Then s = s & "?" : Err.Clear
+ s = s & vbLf
+ For i = 1 To m.NbCommands
+  Set c = m.Commands.Item(i)
+  s = s & "   cmd " & c.Name & " = " & m.GetCommandValue(i)
+  If Err.Number <> 0 Then s = s & "?" : Err.Clear
+  s = s & "   joint=" & c.Joint.Name
+  If Err.Number <> 0 Then s = s & "?" : Err.Clear
+  s = s & vbLf
+ Next
+ For i = 1 To m.NbJoints
+  Set j = m.Joints.Item(i)
+  s = s & "   joint " & j.Name & "  type=" & j.Type
+  If Err.Number <> 0 Then Err.Clear
+  s = s & vbLf
+ Next
+ Set laws = m.Laws
+ If Err.Number = 0 Then
+  s = s & "   laws=" & laws.Count & vbLf
+  For i = 1 To laws.Count
+   s = s & "   law " & laws.Item(i).Name & vbLf
+  Next
+ Else
+  Err.Clear
+ End If
+Next
+' zakoni kao Knowledge relacije u sklopu (Relations\...Law / KINTime)
+Set rels = root.Relations
+For i = 1 To rels.Count
+ Set rel = rels.Item(i)
+ If InStr(rel.Value, "KINTime") > 0 Or InStr(LCase(rel.Name), "law") > 0 Then
+  s = s & "   rel " & rel.Name & ": " & Left(rel.Value, 200) & vbLf
+ End If
+Next
+CATMain = s
+End Function

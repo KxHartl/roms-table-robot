@@ -1,0 +1,118 @@
+' Preslagivanje src\01_cad u novi raspored mapa KROZ CATIA (SaveAs), tako da sve
+' veze (sklop -> dio, dio -> master) ostanu ispravne. Datoteke se NE smiju samo
+' premjestiti u Exploreru - sklopovi pamte putanje.
+'
+'   00_main       master, main_assembly, assembly_drawing
+'   01_table      table_mainAssembly, profili, ploce, sub_gusset_*, sub_foot
+'   03_bosch      Bosch dijelovi: GUSSET_*, FOUNDATION_BRACKET, LEVELING_FOOT,
+'                 DAMPING_RING, TNUT, THEAD_BOLT, ANCHOR_BOLT, collar_nut
+'   04_fasteners  DIN vijci, matice, podloske, zatici
+'   05_robot      robot (bez promjene)
+'   06_tool       alat (bez promjene)
+'   07_schunk     SCHUNK hvataljke (bivsi 11_hvataljke), podmape se zadrzavaju
+'
+' POSTUPAK (cista sesija, nista nespremljeno):
+'   1. otvoriti SVE sklopove i crteze iz 01_cad (05_open ...), da su svi korisnici
+'      premjestenih datoteka u sesiji - inace ostaju s pokidanom vezom,
+'   2. 30_reorganize_tree dry  -> provjeriti popis,
+'   3. 30_reorganize_tree fix  -> SaveAs premjestenih + Save svih ostalih otvorenih,
+'   4. zatvoriti CATIA, obrisati stare kopije, otvoriti main_assembly iz 00_main i
+'      provjeriti 03/04_dbg.
+' Argumenti: mode "dry"/"fix", root = puna putanja do 01_cad.
+Function Target(nm, oldPath, root)
+Dim l, rest
+l = LCase(nm)
+Target = ""
+If l = "master.catpart" Or l = "main_assembly.catproduct" Or l = "assembly_drawing.catdrawing" Then
+ Target = root & "\00_main\" & nm
+ElseIf l = "table_mainassembly.catproduct" Or InStr(l, "_profile.catpart") > 0 Or l = "upper_plate.catpart" Or l = "lower_plate.catpart" Or InStr(l, "sub_gusset_") = 1 Or l = "sub_foot.catproduct" Then
+ Target = root & "\01_table\" & nm
+ElseIf InStr(l, "gusset_") = 1 Or InStr(l, "foundation_bracket") = 1 Or InStr(l, "leveling_foot") = 1 Or InStr(l, "damping_ring") = 1 Or InStr(l, "tnut_") = 1 Or InStr(l, "thead_bolt") = 1 Or InStr(l, "anchor_bolt") = 1 Or InStr(l, "collar_nut") = 1 Then
+ Target = root & "\03_bosch\" & nm
+ElseIf InStr(LCase(oldPath), "\11_hvataljke\") > 0 Then
+ rest = Mid(oldPath, InStr(LCase(oldPath), "\11_hvataljke\") + Len("\11_hvataljke\"))
+ Target = root & "\07_schunk\" & rest
+End If
+End Function
+
+' mapa sa svim nadmapama (CreateFolder radi samo jednu razinu)
+Sub MakeDirs(fso, dirp)
+If fso.FolderExists(dirp) Then Exit Sub
+MakeDirs fso, fso.GetParentFolderName(dirp)
+fso.CreateFolder dirp
+End Sub
+
+' SaveAs ne uspije dok je sklop otvoren u vise prozora ("Several editors") -
+' ostavi samo prozor main_assembly (ili aktivni, ako njega nema).
+Sub OneWindow()
+Dim i, keep
+On Error Resume Next
+Set keep = CATIA.ActiveWindow
+For i = 1 To CATIA.Windows.Count
+ If InStr(CATIA.Windows.Item(i).Name, "main_assembly.CATProduct") = 1 Then Set keep = CATIA.Windows.Item(i)
+Next
+keep.Activate
+For i = CATIA.Windows.Count To 1 Step -1
+ If CATIA.Windows.Item(i).Name <> keep.Name Then CATIA.Windows.Item(i).Close
+Next
+End Sub
+
+Function CATMain(mode, root)
+Dim s, i, d, t, moved(), nm, n, fso, dirp, k, others
+On Error Resume Next
+If mode = "" Then mode = "dry"
+If root = "" Then root = "C:\Projects\FSB\semestar_7\roms\projektni_zadatak\src\01_cad"
+Set fso = CreateObject("Scripting.FileSystemObject")
+n = 0
+ReDim moved(CATIA.Documents.Count)
+For i = 1 To CATIA.Documents.Count
+ Set d = CATIA.Documents.Item(i)
+ If InStr(LCase(d.FullName), LCase(root)) = 1 Then
+  t = Target(d.Name, d.FullName, root)
+  If t <> "" And LCase(t) <> LCase(d.FullName) Then
+   s = s & "PREMJESTI " & Mid(d.FullName, Len(root) + 2) & "  ->  " & Mid(t, Len(root) + 2) & vbLf
+   moved(n) = d.Name & "|" & t
+   n = n + 1
+  End If
+ End If
+Next
+s = s & "za premjestiti: " & n & " od " & CATIA.Documents.Count & " otvorenih" & vbLf
+If mode <> "fix" Then
+ CATMain = s & "mode=dry" & vbLf
+ Exit Function
+End If
+CATIA.DisplayFileAlerts = False
+OneWindow
+' 1. SaveAs premjestenih: prvo dijelovi, pa sklopovi, pa crtezi
+For Each ext In Array(".catpart", ".catproduct", ".catdrawing")
+ For k = 0 To n - 1
+  nm = Split(moved(k), "|")(0)
+  t = Split(moved(k), "|")(1)
+  If LCase(Right(nm, Len(ext))) = ext Then
+   MakeDirs fso, fso.GetParentFolderName(t)
+   CATIA.Documents.Item(nm).SaveAs t
+   If Err.Number <> 0 Then
+    s = s & "SAVEAS ERR " & nm & ": " & Err.Description & vbLf
+    Err.Clear
+   End If
+  End If
+ Next
+Next
+' 2. Save svih ostalih dokumenata iz stabla, da zapamte nove putanje
+others = 0
+For i = 1 To CATIA.Documents.Count
+ Set d = CATIA.Documents.Item(i)
+ If InStr(LCase(d.FullName), LCase(root)) = 1 Then
+  d.Save
+  If Err.Number <> 0 Then
+   s = s & "SAVE ERR " & d.Name & ": " & Err.Description & vbLf
+   Err.Clear
+  Else
+   others = others + 1
+  End If
+ End If
+Next
+CATIA.DisplayFileAlerts = True
+s = s & "spremljeno dokumenata: " & others & vbLf & "mode=fix - sada zatvoriti CATIA i obrisati stare kopije" & vbLf
+CATMain = s
+End Function

@@ -1,0 +1,68 @@
+' Postavi komande mehanizma "Robot" na pozu i provjeri gdje zavrsi alat.
+'   pose = "home"      -> sve komande 0; svi linkovi moraju biti na identitetu
+'   pose = "P1".."P6"  -> kutovi iz master\Pn_j1/j2/j3/j5 (J4 = 0, J6 = J1 kao u zakonima);
+'                         ishodiste tool_1 (prirubnica) mora biti tool_len iznad tocke Pn,
+'                         u koordinatama robota (baza = ishodiste robot_mainAssembly).
+' Ne sprema. Nakon provjere vratiti s pose = "home".
+Function F(v)
+F = FormatNumber(v, 3, -1, 0, 0)
+End Function
+
+Function Num(prm, n)
+' vrijednost parametra bez jedinice (mm ili deg)
+Num = prm.Item(n).Value
+End Function
+
+Function CATMain(pose)
+Dim root, m, mp, s, v(5), i, p, a(11), pn, tl, want(2), t(11), k
+On Error Resume Next
+If pose = "" Then pose = "home"
+Set root = CATIA.Documents.Item("robot_mainAssembly.CATProduct").Product
+Set m = root.GetTechnologicalObject("Mechanisms").Item(1)
+Set mp = CATIA.Documents.Item("master.CATPart").Part.Parameters
+If Err.Number <> 0 Then
+ CATMain = "robot_mainAssembly ili master nije otvoren"
+ Exit Function
+End If
+For i = 0 To 5 : v(i) = 0 : Next
+If LCase(pose) <> "home" Then
+ pn = UCase(pose)
+ ' Value kutnog parametra je u stupnjevima (Knowledge), duljine u mm
+ v(0) = Num(mp, pn & "_j1")
+ v(1) = Num(mp, pn & "_j2")
+ v(2) = Num(mp, pn & "_j3")
+ v(4) = Num(mp, pn & "_j5")
+ v(5) = v(0)
+End If
+m.PutCommandValues v, Nothing
+If Err.Number <> 0 Then
+ Err.Clear
+ m.PutCommandValues v
+End If
+If Err.Number <> 0 Then
+ s = s & "PutCommandValues ERR " & Err.Description & vbLf
+ Err.Clear
+End If
+s = s & pose & " komande:"
+For i = 0 To 5 : s = s & " " & F(v(i)) : Next
+s = s & vbLf
+For i = 1 To root.Products.Count
+ Set p = root.Products.Item(i)
+ p.Position.GetComponents a
+ s = s & "  " & p.Name & "  O=(" & F(a(9)) & "," & F(a(10)) & "," & F(a(11)) & ")  X=(" & F(a(0)) & "," & F(a(1)) & "," & F(a(2)) & ")  Y=(" & F(a(3)) & "," & F(a(4)) & "," & F(a(5)) & ")" & vbLf
+ If InStr(p.Name, "tool") = 1 Then
+  For Each k In Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+   t(k) = a(k)
+  Next
+ End If
+Next
+If LCase(pose) <> "home" Then
+ tl = Num(mp, "tool_len")
+ want(0) = Num(mp, pn & "_x")
+ want(1) = Num(mp, pn & "_y")
+ want(2) = Num(mp, pn & "_z") + tl
+ s = s & "prirubnica treba biti (" & F(want(0)) & "," & F(want(1)) & "," & F(want(2)) & ")  greska=" & _
+     F(Sqr((t(9) - want(0)) ^ 2 + (t(10) - want(1)) ^ 2 + (t(11) - want(2)) ^ 2)) & " mm" & vbLf
+End If
+CATMain = s
+End Function

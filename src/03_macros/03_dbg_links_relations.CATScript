@@ -1,0 +1,30 @@
+' Za svaki otvoreni CATPart: formule koje koriste vanjske parametre
+' (External Parameters\...), sa trenutnom izlaznom vrijednoscu, te broj
+' parametara pod "External Parameters". Argument (opcionalno): filtar imena
+' dokumenta, npr. "rb_link".
+Function CATMain(filt)
+Dim s, i, j, d, part, r, o, n
+On Error Resume Next
+For i = 1 To CATIA.Documents.Count
+ Set d = CATIA.Documents.Item(i)
+ If LCase(Right(d.Name, 8)) = ".catpart" And (filt = "" Or InStr(LCase(d.Name), LCase(filt)) > 0) Then
+  Set part = d.Part
+  n = 0
+  For j = 1 To part.Parameters.Count
+   If InStr(part.Parameters.Item(j).Name, "External Parameters\") > 0 Then n = n + 1
+  Next
+  If n > 0 Then s = s & "== " & d.Name & "  externalParams=" & n & vbLf
+  For j = 1 To part.Relations.Count
+   Set r = part.Relations.Item(j)
+   If InStr(r.Value, "External Parameters") > 0 Or InStr(r.Value, "master\") > 0 Or InStr(r.Value, "`rb_") > 0 Then
+    s = s & "   " & r.Name & " [" & r.Value & "]"
+    Err.Clear : o = r.GetOutParameter(1).Name
+    If Err.Number = 0 Then s = s & " -> " & o & " = " & r.GetOutParameter(1).ValueAsString
+    Err.Clear
+    s = s & vbLf
+   End If
+  Next
+ End If
+Next
+CATMain = s
+End Function

@@ -1,0 +1,11 @@
+' Popis otvorenih dokumenata, putanja i je li spremljen.
+Function CATMain()
+Dim s, i, d
+On Error Resume Next
+s = "documents=" & CATIA.Documents.Count & vbLf
+For i = 1 To CATIA.Documents.Count
+ Set d = CATIA.Documents.Item(i)
+ s = s & d.FullName & "  saved=" & d.Saved & vbLf
+Next
+CATMain = s
+End Function

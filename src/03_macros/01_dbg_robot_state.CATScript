@@ -1,0 +1,42 @@
+' Stanje robota: vrijednosti komandi mehanizma "Robot" i polozaj svakog linka u
+' robot_mainAssembly. Linkovi su modelirani u koordinatama baze, pa u HOME pozi
+' (sve komande 0) svaki link mora biti na identitetu: O=(0,0,0), X=(1,0,0), Z=(0,0,1).
+' "odmak" je kut zakreta linka od identiteta u stupnjevima.
+Function F(v)
+F = FormatNumber(v, 3, -1, 0, 0)
+End Function
+
+Function Acos(x)
+If x >= 1 Then
+ Acos = 0
+ElseIf x <= -1 Then
+ Acos = 4 * Atn(1)
+Else
+ Acos = Atn(-x / Sqr(1 - x * x)) + 2 * Atn(1)
+End If
+End Function
+
+Function CATMain()
+Dim root, m, s, v(5), i, p, a(11), tr, ang
+On Error Resume Next
+Set root = CATIA.Documents.Item("robot_mainAssembly.CATProduct").Product
+If Err.Number <> 0 Then CATMain = "robot_mainAssembly nije otvoren" : Exit Function
+Set m = root.GetTechnologicalObject("Mechanisms").Item(1)
+s = "mehanizam " & m.Name & "  DOF=" & m.NbDof & vbLf
+m.GetCommandValues v
+If Err.Number <> 0 Then
+ s = s & "GetCommandValues ERR " & Err.Description & vbLf : Err.Clear
+Else
+ s = s & "komande:"
+ For i = 0 To 5 : s = s & " " & F(v(i)) : Next
+ s = s & vbLf
+End If
+For i = 1 To root.Products.Count
+ Set p = root.Products.Item(i)
+ p.Position.GetComponents a
+ tr = a(0) + a(4) + a(8)
+ ang = Acos((tr - 1) / 2) * 45 / Atn(1)
+ s = s & p.Name & "  O=(" & F(a(9)) & "," & F(a(10)) & "," & F(a(11)) & ")  X=(" & F(a(0)) & "," & F(a(1)) & "," & F(a(2)) & ")  Z=(" & F(a(6)) & "," & F(a(7)) & "," & F(a(8)) & ")  odmak=" & F(ang) & "deg" & vbLf
+Next
+CATMain = s
+End Function

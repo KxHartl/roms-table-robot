@@ -1,0 +1,154 @@
+' Ponovno vezanje "External Parameters" na UCITANI master.CATPart.
+'
+' Kad se dio kopira/premjesti izvan CATIA, njegovi uvezeni parametri (Paste Special >
+' As Result With Link) mogu ostati vezani na stari master: vrijednost se zamrzne i
+' nikakav Update je ne mijenja (robot je tako ostao na duljinama 351/351 mm dok je
+' master imao 300/320). Za svaki takav parametar X u dijelu makro:
+'   1. stari parametar preimenuje u X__old (da se stari i novi ne mogu zamijeniti),
+'   2. kopira master\X i zalijepi ga u dio s vezom (PasteSpecial "CATPrtResult"),
+'   3. u svim formulama dijela zamijeni X__old novim parametrom,
+'   4. obrise X__old - tek kad ga nijedna formula vise ne koristi.
+' Ako neki korak ne uspije, X__old ostaje i formule rade dalje (samo sa starom
+' vrijednoscu) - nista se ne brise naslijepo.
+'
+' KONTEKST: dijelovi robota su "designed in context robot_mainAssembly" - veza se smije
+' napraviti samo u tom sklopu ("selection in master.1 is forbidden since rb_link2.1 was
+' designed in context robot_mainAssembly"). Argument ctx = ime sklopa; makro ga otvori
+' u vlastitom prozoru jer Copy radi samo nad UI-aktivnim dokumentom
+' ("No CSO element remains after the filtering through the UI active object").
+' Prazan ctx = aktivni prozor. Parametri X__old (ostatak prekinutog runa) se preuzimaju.
+'
+' Argumenti: filt  - dio imena dokumenta (npr. "rb_link"), prazno = svi dijelovi
+'            mode  - "dry" (default) samo ispisuje, "fix" radi izmjene
+'            which - "diff" (default) samo parametri razliciti od mastera,
+'                    "all" svi koji postoje u masteru (i oni koji se slucajno poklapaju)
+'            ctx   - npr. robot_mainAssembly.CATProduct (za robota), prazno = aktivni
+' Nista ne sprema - provjera s 02_dbg_external_params, spremanje s 20_save_docs.
+Function G(prm, n)
+On Error Resume Next
+Err.Clear
+G = prm.Item(n).ValueAsString
+If Err.Number <> 0 Then G = "(nema)"
+End Function
+
+Function ShortName(p)
+Dim nm
+nm = p.Name
+If InStr(nm, "\") > 0 Then nm = Mid(nm, InStrRev(nm, "\") + 1)
+ShortName = nm
+End Function
+
+Function Uses(part, ref)
+Dim j
+Uses = 0
+For j = 1 To part.Relations.Count
+ If InStr(part.Relations.Item(j).Value, ref) > 0 Then Uses = Uses + 1
+Next
+End Function
+
+Function CATMain(filt, mode, which, ctx)
+Dim s, i, j, k, d, part, mp, p, nm, pre, mv, sel, cnt, np, r, expr, oldRef, newRef, olds(), nt, done
+On Error Resume Next
+pre = "External Parameters\"
+If mode = "" Then mode = "dry"
+If which = "" Then which = "diff"
+Set mp = CATIA.Documents.Item("master.CATPart").Part.Parameters
+If Err.Number <> 0 Then CATMain = "master.CATPart nije otvoren" : Exit Function
+If ctx <> "" And CATIA.ActiveDocument.Name <> ctx Then
+ CATIA.Documents.Open CATIA.Documents.Item(ctx).FullName
+ If Err.Number <> 0 Then
+  CATMain = "ne mogu otvoriti prozor za " & ctx & ": " & Err.Description
+  Exit Function
+ End If
+End If
+Set sel = CATIA.ActiveDocument.Selection
+s = "kontekst: " & CATIA.ActiveDocument.Name & vbLf
+done = 0
+For i = 1 To CATIA.Documents.Count
+ Set d = CATIA.Documents.Item(i)
+ If LCase(Right(d.Name, 8)) = ".catpart" And d.Name <> "master.CATPart" And _
+    (filt = "" Or InStr(LCase(d.Name), LCase(filt)) > 0) Then
+  Set part = d.Part
+  nt = 0
+  ReDim olds(200)
+  For j = 1 To part.Parameters.Count
+   Set p = part.Parameters.Item(j)
+   If InStr(p.Name, pre) > 0 Or Right(p.Name, 5) = "__old" Then
+    nm = ShortName(p)
+    If Right(nm, 5) = "__old" Then nm = Left(nm, Len(nm) - 5)
+    mv = G(mp, nm)
+    If mv = "(nema)" Then
+     s = s & "   " & d.Name & " " & nm & ": nema ga u masteru, preskacem" & vbLf
+    ElseIf which = "all" Or p.ValueAsString <> mv Then
+     Set olds(nt) = p
+     nt = nt + 1
+    End If
+   End If
+  Next
+  For k = 0 To nt - 1
+   Set p = olds(k)
+   nm = ShortName(p)
+   If Right(nm, 5) = "__old" Then nm = Left(nm, Len(nm) - 5)
+   s = s & d.Name & " " & nm & ": " & p.ValueAsString & " -> " & G(mp, nm)
+   If mode = "fix" Then
+    ' 1. stari u X__old
+    If Right(p.Name, 5) <> "__old" Then p.Rename nm & "__old"
+    ' imena kako ih formule pisu (GetNameToUseInRelation zna vratiti staro ime)
+    oldRef = "`" & nm & "__old`"
+    newRef = "`" & pre & nm & "`"
+    ' 2. nova kopija s vezom - osim ako je vec zalijepljena (prekinuti run)
+    Set np = Nothing
+    Set np = part.Parameters.Item(pre & nm)
+    Err.Clear
+    If np Is Nothing Then
+     sel.Clear
+     sel.Add mp.Item(nm)
+     sel.Copy
+     sel.Clear
+     sel.Add part
+     sel.PasteSpecial "CATPrtResult"
+     sel.Clear
+     Err.Clear
+     Set np = part.Parameters.Item(pre & nm)
+    End If
+    If np Is Nothing Then
+     s = s & "  PASTE ERR " & Err.Description & " (ostaje " & nm & "__old)"
+     Err.Clear
+    Else
+     ' 3. formule na novi
+     For j = 1 To part.Relations.Count
+      Set r = part.Relations.Item(j)
+      expr = r.Value
+      If InStr(expr, oldRef) > 0 Then
+       r.Modify Replace(expr, oldRef, newRef)
+       If Err.Number <> 0 Then
+        s = s & "  MODIFY ERR " & r.Name & " " & Err.Description
+        Err.Clear
+       End If
+      End If
+     Next
+     ' 4. obrisi stari samo ako ga vise nitko ne koristi
+     If Uses(part, oldRef) = 0 Then
+      sel.Clear
+      sel.Add p
+      sel.Delete
+      sel.Clear
+      If Err.Number <> 0 Then
+       s = s & "  DELETE ERR " & Err.Description
+       Err.Clear
+      End If
+      s = s & "  OK " & newRef & " = " & np.ValueAsString
+      done = done + 1
+     Else
+      s = s & "  !! " & nm & "__old se jos koristi, nije obrisan"
+     End If
+    End If
+   End If
+   s = s & vbLf
+  Next
+  If mode = "fix" And nt > 0 Then part.Update
+ End If
+Next
+s = s & "mode=" & mode & " relinked=" & done & vbLf
+CATMain = s
+End Function

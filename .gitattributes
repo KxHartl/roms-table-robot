@@ -1,0 +1,10 @@
+*.CATPart     binary
+*.catpart     binary
+*.CATProduct  binary
+*.catproduct  binary
+*.CATDrawing  binary
+*.stp         binary
+*.vb          text eol=crlf
+*.CATScript   text eol=crlf
+*.ps1         text eol=crlf
+*.config      text eol=crlf

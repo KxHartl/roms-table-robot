@@ -1,0 +1,38 @@
+' Obrise uvezene mehanizme u main_assembly i ponovno ih uveze (DMU Kinematics >
+' Import Sub-Mechanisms). Isto radi aplikacija na kraju Apply (MechanismImport.vb).
+'
+' Uvezeni "Robot" u main_assembly padne na DOF=Undefined cim se promijeni geometrija
+' zglobova (duljine, montaza robota, alat); robot_mainAssembly ostaje ispravan.
+' API nema naredbu za uvoz, pa makro pokrece CATIA naredbu - na kraju CATIA pokaze
+' "Sub-mechanisms Import Result": kliknuti OK (ili catia_dialogs.ps1 -ClickOk).
+' Nakon OK: 12_kin_mechanism main_assembly.CATProduct -> Robot DOF=6.
+Function CATMain()
+Dim s, d, root, mechs, sel, k
+On Error Resume Next
+Set d = CATIA.Documents.Item("main_assembly.CATProduct")
+If Err.Number <> 0 Then
+ CATMain = "main_assembly nije otvoren"
+ Exit Function
+End If
+d.Activate
+Set root = d.Product
+Set mechs = root.GetTechnologicalObject("Mechanisms")
+s = "obrisano uvezenih: " & mechs.Count & vbLf
+Set sel = d.Selection
+sel.Clear
+For k = mechs.Count To 1 Step -1
+ sel.Add mechs.Item(k)
+Next
+If mechs.Count > 0 Then sel.Delete
+sel.Clear
+If CATIA.GetWorkbenchId <> "DMUKinematics" Then CATIA.StartWorkbench "DMUKinematics"
+sel.Add root
+CATIA.StartCommand "Import Sub-Mechanisms"
+If Err.Number <> 0 Then
+ s = s & "StartCommand ERR " & Err.Description & vbLf
+ Err.Clear
+Else
+ s = s & "uvoz pokrenut - potvrditi OK u CATIA-i" & vbLf
+End If
+CATMain = s
+End Function

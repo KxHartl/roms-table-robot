@@ -1,0 +1,16 @@
+' Otvara dokument (puna putanja) i vraca popis svih ucitanih dokumenata.
+' Bez argumenta otvara main_assembly iz dev stabla.
+Function CATMain(path)
+Dim s, i, d
+On Error Resume Next
+CATIA.DisplayFileAlerts = False
+CATIA.Documents.Open path
+If Err.Number <> 0 Then s = "OPEN ERR " & Err.Description & vbLf : Err.Clear
+CATIA.DisplayFileAlerts = True
+s = s & "documents=" & CATIA.Documents.Count & vbLf
+For i = 1 To CATIA.Documents.Count
+ Set d = CATIA.Documents.Item(i)
+ s = s & d.FullName & vbLf
+Next
+CATMain = s
+End Function

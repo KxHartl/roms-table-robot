@@ -1,0 +1,12 @@
+# VB build output (build.ps1)
+src/02_vb/build/
+src/02_vb/bin/
+src/02_vb/obj/
+*.suo
+*.user
+.vs/
+
+# CATIA temp / lock
+*.CATPart.lock
+*.CATProduct.lock
+~$*

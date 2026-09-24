@@ -1,0 +1,81 @@
+' Postavlja HOME: linkove robota vraca na identitet (poza u kojoj su modelirani -
+' ruka ravno gore, podlaktica vodoravno prema +X) i tu pozu proglasava nulom komandi
+' (ResetCmdValueToZero). Alat (sve sto nije rb_* ni master) putuje zajedno s
+' rb_link6, tj. zadrzava relativni polozaj prema linku 6.
+' Argument mode: "dry" (default) samo ispisuje, "fix" radi izmjene. Ne sprema.
+' Provjera nakon toga: 01_dbg_robot_state (komande 0, odmak 0 na svim linkovima).
+Function F(v)
+F = FormatNumber(v, 3, -1, 0, 0)
+End Function
+
+' c = a * b  (CATIA 12-komponentna matrica: 0-2 X os, 3-5 Y os, 6-8 Z os, 9-11 ishodiste)
+Sub Mul(a, b, c)
+Dim i, j
+For j = 0 To 2
+ For i = 0 To 2
+  c(j * 3 + i) = a(i) * b(j * 3) + a(3 + i) * b(j * 3 + 1) + a(6 + i) * b(j * 3 + 2)
+ Next
+Next
+For i = 0 To 2
+ c(9 + i) = a(i) * b(9) + a(3 + i) * b(10) + a(6 + i) * b(11) + a(9 + i)
+Next
+End Sub
+
+' inverz krute transformacije
+Sub Inv(a, c)
+Dim i, j
+For j = 0 To 2
+ For i = 0 To 2
+  c(j * 3 + i) = a(i * 3 + j)
+ Next
+Next
+For i = 0 To 2
+ c(9 + i) = -(a(i * 3) * a(9) + a(i * 3 + 1) * a(10) + a(i * 3 + 2) * a(11))
+Next
+End Sub
+
+Function CATMain(mode)
+Dim root, m, s, i, p, a(11), l6(11), il6(11), rel(11), ident
+On Error Resume Next
+If mode = "" Then mode = "dry"
+Set root = CATIA.Documents.Item("robot_mainAssembly.CATProduct").Product
+If Err.Number <> 0 Then CATMain = "robot_mainAssembly nije otvoren" : Exit Function
+Set m = root.GetTechnologicalObject("Mechanisms").Item(1)
+ident = Array(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+root.Products.Item("rb_link6.1").Position.GetComponents l6
+If Err.Number <> 0 Then CATMain = "nema rb_link6.1" : Exit Function
+Inv l6, il6
+For i = 1 To root.Products.Count
+ Set p = root.Products.Item(i)
+ p.Position.GetComponents a
+ If InStr(p.Name, "rb_") = 1 Then
+  s = s & p.Name & ": O=(" & F(a(9)) & "," & F(a(10)) & "," & F(a(11)) & ") -> identitet" & vbLf
+  If mode = "fix" Then p.Position.SetComponents ident
+ ElseIf InStr(p.Name, "master") = 0 Then
+  ' novo = l6_novo(=I) * inv(l6_staro) * staro
+  Mul il6, a, rel
+  s = s & p.Name & ": ide s linkom 6, novo O=(" & F(rel(9)) & "," & F(rel(10)) & "," & F(rel(11)) & ")" & vbLf
+  If mode = "fix" Then p.Position.SetComponents rel
+ End If
+ If Err.Number <> 0 Then
+  s = s & "   ERR " & Err.Description & vbLf
+  Err.Clear
+ End If
+Next
+If mode = "fix" Then
+ m.ResetCmdValueToZero
+ If Err.Number <> 0 Then
+  s = s & "ResetCmdValueToZero ERR " & Err.Description & vbLf
+  Err.Clear
+ End If
+ m.Update
+ If Err.Number <> 0 Then
+  s = s & "mechanism Update ERR " & Err.Description & vbLf
+  Err.Clear
+ End If
+ root.Update
+ s = s & "HOME postavljen (komande = 0)" & vbLf
+End If
+s = s & "mode=" & mode & vbLf
+CATMain = s
+End Function

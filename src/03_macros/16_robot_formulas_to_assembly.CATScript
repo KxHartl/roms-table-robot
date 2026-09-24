@@ -1,0 +1,92 @@
+' Premjesta formule robota iz dijelova u robot_mainAssembly.
+'
+' ZASTO: dijelovi robota (rb_base, rb_link1-6) uzimaju duljine iz mastera preko
+' "External Parameters" (Paste Special With Link). Te kopije se kroz API NE osvjezavaju -
+' ni Update, ni UpdateObject, ni "Synchronize all external references" ne pomazu
+' (provjereno 24.09.2026: master rb_z_J3 = 690, link i dalje 630, sve "up to date").
+' Zato promjena duljine segmenata iz aplikacije nije dolazila do robota.
+'
+' Formula na razini sklopa (`master\rb_z_J3`) se racuna kod svakog Update sklopa - isto
+' kao zakoni komandi, koji vec tako citaju master\Pn_jk. Za svaku formulu dijela koja
+' koristi `External Parameters\X` makro:
+'   1. zapamti izraz i izlazni parametar,
+'   2. obrise formulu u dijelu (parametar smije voditi samo jedna relacija),
+'   3. u robot_mainAssembly napravi F_<dio>_<formula> s istim izrazom, ali `master\X`,
+'   4. ako 3. ne uspije, vrati formulu u dio s originalnim izrazom.
+' Uvezeni parametri ostaju u dijelu (nista ih vise ne koristi).
+'
+' Argumenti: filt - dio imena dijela (default "rb_"), mode "dry"/"fix". Ne sprema.
+Function CATMain(filt, mode)
+Dim s, root, rrels, i, j, d, part, r, expr, newExpr, outP, nm, fname, created, pre, n, todo(), nt
+On Error Resume Next
+If filt = "" Then filt = "rb_"
+If mode = "" Then mode = "dry"
+pre = "`External Parameters\"
+Set root = CATIA.Documents.Item("robot_mainAssembly.CATProduct").Product
+If Err.Number <> 0 Then
+ CATMain = "robot_mainAssembly nije otvoren"
+ Exit Function
+End If
+Set rrels = root.Relations
+n = 0
+For i = 1 To CATIA.Documents.Count
+ Set d = CATIA.Documents.Item(i)
+ If LCase(Right(d.Name, 8)) = ".catpart" And InStr(LCase(d.Name), LCase(filt)) = 1 Then
+  Set part = d.Part
+  nt = 0
+  ReDim todo(50)
+  For j = 1 To part.Relations.Count
+   If InStr(part.Relations.Item(j).Value, pre) > 0 Then
+    todo(nt) = part.Relations.Item(j).Name
+    nt = nt + 1
+   End If
+  Next
+  For j = 0 To nt - 1
+   Set r = part.Relations.Item(todo(j))
+   expr = r.Value
+   newExpr = Replace(expr, pre, "`master\")
+   Set outP = r.GetOutParameter(1)
+   If Err.Number <> 0 Then
+    Err.Clear
+    Set outP = r.OutputParameter
+   End If
+   nm = Left(d.Name, Len(d.Name) - 8)
+   fname = "F_" & nm & "_" & todo(j)
+   s = s & nm & "\" & todo(j) & ": [" & Trim(expr) & "] -> " & fname & " [" & Trim(newExpr) & "]"
+   If mode = "fix" Then
+    Err.Clear
+    part.Relations.Remove todo(j)
+    If Err.Number <> 0 Then
+     s = s & "  REMOVE ERR " & Err.Description
+     Err.Clear
+    Else
+     Set created = Nothing
+     Set created = rrels.CreateFormula(fname, "master -> " & nm, outP, newExpr)
+     If Err.Number <> 0 Or created Is Nothing Then
+      s = s & "  CREATE ERR " & Err.Description & " -> vracam u dio"
+      Err.Clear
+      part.Relations.CreateFormula todo(j), "", outP, expr
+      If Err.Number <> 0 Then
+       s = s & "  !! RESTORE ERR " & Err.Description
+       Err.Clear
+      End If
+     Else
+      s = s & "  OK"
+      n = n + 1
+     End If
+    End If
+   End If
+   s = s & vbLf
+  Next
+ End If
+Next
+If mode = "fix" And n > 0 Then
+ root.Update
+ If Err.Number <> 0 Then
+  s = s & "root Update ERR " & Err.Description & vbLf
+  Err.Clear
+ End If
+End If
+s = s & "mode=" & mode & "  premjesteno=" & n & vbLf
+CATMain = s
+End Function

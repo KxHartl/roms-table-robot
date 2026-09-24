@@ -1,0 +1,52 @@
+' Nezadovoljeni / neazurirani constrainti u cijelom stablu aktivnog (ili zadanog)
+' sklopa, te dijelovi koji nisu up-to-date. Status <> 0 znaci "nije zadovoljen ili
+' nije azuriran" (ne nuzno pokidana veza).
+' Argument: ime sklopa, prazno = aktivni dokument.
+Dim s, bad
+
+Sub Walk(prod, path)
+Dim cons, i, c, k, ch
+On Error Resume Next
+Set cons = prod.Connections("CATIAConstraints")
+If Err.Number = 0 Then
+ For i = 1 To cons.Count
+  Set c = cons.Item(i)
+  If c.Status <> 0 Then
+   s = s & "!! " & path & " / " & c.Name & "  status=" & c.Status & vbLf
+   bad = bad + 1
+  End If
+ Next
+End If
+Err.Clear
+For k = 1 To prod.Products.Count
+ Set ch = prod.Products.Item(k)
+ If ch.Products.Count > 0 Then Walk ch.ReferenceProduct, path & "/" & ch.Name
+Next
+End Sub
+
+Function CATMain(docName)
+Dim d, i, part, n
+On Error Resume Next
+If docName = "" Then
+ Set d = CATIA.ActiveDocument
+Else
+ Set d = CATIA.Documents.Item(docName)
+End If
+s = "sklop: " & d.Name & vbLf
+bad = 0
+Walk d.Product, d.Product.Name
+s = s & "nezadovoljenih constrainta: " & bad & vbLf
+n = 0
+For i = 1 To CATIA.Documents.Count
+ If LCase(Right(CATIA.Documents.Item(i).Name, 8)) = ".catpart" Then
+  Set part = CATIA.Documents.Item(i).Part
+  If Not part.IsUpToDate(part) Then
+   s = s & "   nije up-to-date: " & CATIA.Documents.Item(i).Name & vbLf
+   n = n + 1
+  End If
+  Err.Clear
+ End If
+Next
+s = s & "dijelova koji nisu up-to-date: " & n & vbLf
+CATMain = s
+End Function

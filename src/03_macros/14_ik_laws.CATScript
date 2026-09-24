@@ -1,0 +1,117 @@
+' IK formule u master.CATPart (rekonstrukcija izgubljenog 11_ik_laws).
+'
+' Iste formule kao RobotKinematics.SolveAt u aplikaciji. Knowledge na ovoj verziji nema
+' atan2, pa je J1 = 2*atan(y / (r + x)) - vrijedi i iza robota (do 24.09.2026 je bio
+' atan(y/x), koji trazi x > 0). Za svaku tocku Pn (n = 1..6):
+'   Pn_r, Pn_zw, Pn_dr, Pn_dz, Pn_d  (duljine), Pn_a2abs, Pn_a3abs, Pn_j1/j2/j3/j5 (kutovi)
+' plus izvedeni parametri robota (rb_z_J3, rb_z_J4, rb_x_J5, rb_x_flange, rb_L3,
+' rb_phi3, rb_j3_zero, rb_reach) i tocke staze P2, P4, P5 iz P3, P2P3, P2P4.
+'
+' mode "dry" (default): usporeduje postojece formule s kanonskim izrazom i ispisuje
+'                       sto nedostaje ili se razlikuje.
+' mode "fix":           kreira nedostajuce parametre/formule i ispravlja razlicite.
+' Ulazi (P1_x.., P3_x.., P6_x.., P2P3, P2P4, tool_len, len_J2J3, len_J3J5, rb_a1, rb_d1,
+' rb_a3, rb_d6) se ne diraju - njih pise aplikacija.
+Dim part, prm, rels, s, nMiss, nDiff, nFix, mode
+
+Function Norm(x)
+Norm = Replace(Replace(Replace(x, " ", ""), vbCr, ""), vbLf, "")
+End Function
+
+Sub Want(fname, outName, unit, expr)
+Dim r, p
+On Error Resume Next
+Err.Clear
+Set r = rels.Item(fname)
+If Err.Number <> 0 Then
+ Err.Clear
+ nMiss = nMiss + 1
+ s = s & "NEMA  " & fname & " -> " & outName & vbLf
+ If mode = "fix" Then
+  Set p = prm.Item(outName)
+  If Err.Number <> 0 Then
+   Err.Clear
+   Set p = prm.CreateDimension(outName, unit, 0)
+  End If
+  Set r = rels.CreateFormula(fname, "", p, expr)
+  If Err.Number <> 0 Then
+   s = s & "   CREATE ERR " & Err.Description & vbLf
+   Err.Clear
+  Else
+   nFix = nFix + 1
+  End If
+ End If
+ElseIf Norm(r.Value) <> Norm(expr) Then
+ nDiff = nDiff + 1
+ s = s & "RAZL  " & fname & vbLf & "   ima:  " & r.Value & vbLf & "   treba: " & expr & vbLf
+ If mode = "fix" Then
+  r.Modify expr
+  If Err.Number <> 0 Then
+   s = s & "   MODIFY ERR " & Err.Description & vbLf
+   Err.Clear
+  Else
+   nFix = nFix + 1
+  End If
+ End If
+End If
+End Sub
+
+Function CATMain(m)
+Dim n, P
+On Error Resume Next
+mode = m
+If mode = "" Then mode = "dry"
+Set part = CATIA.Documents.Item("master.CATPart").Part
+If Err.Number <> 0 Then CATMain = "master.CATPart nije otvoren" : Exit Function
+Set prm = part.Parameters
+Set rels = part.Relations
+s = "" : nMiss = 0 : nDiff = 0 : nFix = 0
+
+' --- robot ---------------------------------------------------------------
+Want "F_rb_z_J3", "rb_z_J3", "LENGTH", "`rb_d1` + `len_J2J3`"
+Want "F_rb_z_J4", "rb_z_J4", "LENGTH", "`rb_d1` + `len_J2J3` + `rb_a3`"
+Want "F_rb_x_J5", "rb_x_J5", "LENGTH", "`rb_a1` + `len_J3J5`"
+Want "F_rb_x_flange", "rb_x_flange", "LENGTH", "`rb_a1` + `len_J3J5` + `rb_d6`"
+Want "F_rb_L3", "rb_L3", "LENGTH", "sqrt( `rb_a3` * `rb_a3` + `len_J3J5` * `len_J3J5` )"
+Want "F_rb_phi3", "rb_phi3", "ANGLE", "atan( `rb_a3` / `len_J3J5` )"
+Want "F_rb_j3_zero", "rb_j3_zero", "ANGLE", "90deg - `rb_phi3`"
+Want "F_rb_reach", "rb_reach", "LENGTH", "`rb_a1` + `len_J2J3` + `rb_L3`"
+
+' --- staza: pravokutnik P2-P4 / P3-P5 --------------------------------------
+Want "F_P4P5", "P4P5", "LENGTH", "`P2P3`"
+Want "F_P2_x", "P2_x", "LENGTH", "`P3_x`"
+Want "F_P2_y", "P2_y", "LENGTH", "`P3_y`"
+Want "F_P2_z", "P2_z", "LENGTH", "`P3_z` + `P2P3`"
+Want "F_P4_x", "P4_x", "LENGTH", "`P3_x`"
+Want "F_P4_y", "P4_y", "LENGTH", "`P3_y` + `P2P4`"
+Want "F_P4_z", "P4_z", "LENGTH", "`P3_z` + `P2P3`"
+Want "F_P5_x", "P5_x", "LENGTH", "`P3_x`"
+Want "F_P5_y", "P5_y", "LENGTH", "`P3_y` + `P2P4`"
+Want "F_P5_z", "P5_z", "LENGTH", "`P3_z`"
+
+' --- IK po tocki ------------------------------------------------------------
+For n = 1 To 6
+ P = "P" & n
+ Want "F_" & P & "_r", P & "_r", "LENGTH", "sqrt( `" & P & "_x` * `" & P & "_x` + `" & P & "_y` * `" & P & "_y` )"
+ Want "F_" & P & "_zw", P & "_zw", "LENGTH", "`" & P & "_z` + `tool_len` + `rb_d6`"
+ Want "F_" & P & "_dr", P & "_dr", "LENGTH", "`" & P & "_r` - `rb_a1`"
+ Want "F_" & P & "_dz", P & "_dz", "LENGTH", "`" & P & "_zw` - `rb_d1`"
+ Want "F_" & P & "_d", P & "_d", "LENGTH", "sqrt( `" & P & "_dr` * `" & P & "_dr` + `" & P & "_dz` * `" & P & "_dz` )"
+ Want "F_" & P & "_a2abs", P & "_a2abs", "ANGLE", "( 90deg - atan( `" & P & "_dz` / `" & P & "_dr` ) ) - acos( ( `len_J2J3` * `len_J2J3` + `" & P & "_d` * `" & P & "_d` - `rb_L3` * `rb_L3` ) / ( 2 * `len_J2J3` * `" & P & "_d` ) )"
+ Want "F_" & P & "_a3abs", P & "_a3abs", "ANGLE", "`" & P & "_a2abs` + ( 180deg - acos( ( `len_J2J3` * `len_J2J3` + `rb_L3` * `rb_L3` - `" & P & "_d` * `" & P & "_d` ) / ( 2 * `len_J2J3` * `rb_L3` ) ) )"
+ Want "F_" & P & "_j1", P & "_j1", "ANGLE", "2 * atan( `" & P & "_y` / ( `" & P & "_r` + `" & P & "_x` ) )"
+ Want "F_" & P & "_j2", P & "_j2", "ANGLE", "`" & P & "_a2abs`"
+ Want "F_" & P & "_j3", P & "_j3", "ANGLE", "( `" & P & "_a3abs` - `" & P & "_a2abs` ) - `rb_j3_zero`"
+ Want "F_" & P & "_j5", P & "_j5", "ANGLE", "180deg - ( `" & P & "_a3abs` + `rb_phi3` )"
+Next
+
+If mode = "fix" And nFix > 0 Then part.Update
+s = s & "mode=" & mode & "  nedostaje=" & nMiss & "  razlicito=" & nDiff & "  ispravljeno=" & nFix & vbLf
+' rezultat: kutovi po tocki
+For n = 1 To 6
+ P = "P" & n
+ s = s & P & ": j1=" & prm.Item(P & "_j1").ValueAsString & " j2=" & prm.Item(P & "_j2").ValueAsString & _
+     " j3=" & prm.Item(P & "_j3").ValueAsString & " j5=" & prm.Item(P & "_j5").ValueAsString & vbLf
+Next
+CATMain = s
+End Function

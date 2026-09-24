@@ -1,0 +1,33 @@
+' Spremi SAMO navedene dokumente (umjesto Save All, koji bi spremio i sve usput
+' promijenjene dokumente u sesiji). Argument: imena odvojena zarezom, npr.
+'   "rb_link1.CATPart,rb_link2.CATPart,robot_mainAssembly.CATProduct"
+' Posebna vrijednost "robot" = rb_base, rb_link1-6, robot_mainAssembly i sub_tool_*.
+Function CATMain(names)
+Dim s, arr, nm, d, i, k
+On Error Resume Next
+If LCase(names) = "robot" Then
+ names = "rb_base.CATPart,rb_link1.CATPart,rb_link2.CATPart,rb_link3.CATPart,rb_link4.CATPart,rb_link5.CATPart,rb_link6.CATPart,robot_mainAssembly.CATProduct"
+ For i = 1 To CATIA.Documents.Count
+  If InStr(LCase(CATIA.Documents.Item(i).Name), "sub_tool_") = 1 Then names = names & "," & CATIA.Documents.Item(i).Name
+ Next
+End If
+arr = Split(names, ",")
+For k = 0 To UBound(arr)
+ nm = Trim(arr(k))
+ If nm <> "" Then
+  Err.Clear
+  Set d = CATIA.Documents.Item(nm)
+  If Err.Number <> 0 Then
+   s = s & "nema: " & nm & vbLf
+  Else
+   d.Save
+   If Err.Number <> 0 Then
+    s = s & "SAVE ERR " & nm & ": " & Err.Description & vbLf
+   Else
+    s = s & "spremljeno: " & d.FullName & vbLf
+   End If
+  End If
+ End If
+Next
+CATMain = s
+End Function

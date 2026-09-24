@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{2C9F1B7A-1E2D-4B6C-9A11-7F3A2B6C4D5E}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>RomsCatiaUI</RootNamespace>
+    <AssemblyName>RomsCatiaUI</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <MyType>WindowsForms</MyType>
+    <OptionExplicit>On</OptionExplicit>
+    <OptionStrict>Off</OptionStrict>
+    <OptionInfer>On</OptionInfer>
+    <StartupObject>RomsCatiaUI.Program</StartupObject>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <DefineDebug>true</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <OutputPath>bin\Debug\</OutputPath>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <DefineTrace>true</DefineTrace>
+    <OutputPath>bin\Release\</OutputPath>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+  <ItemGroup>
+    <Import Include="Microsoft.VisualBasic" />
+    <Import Include="System" />
+    <Import Include="System.Collections.Generic" />
+    <Import Include="System.Drawing" />
+    <Import Include="System.Windows.Forms" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="src\Program.vb" />
+    <Compile Include="src\AppConfig.vb" />
+    <Compile Include="src\MainForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="src\MainForm.Designer.vb">
+      <DependentUpon>MainForm.vb</DependentUpon>
+    </Compile>
+    <Compile Include="src\Model\ProfileCatalog.vb" />
+    <Compile Include="src\Model\FastenerCatalog.vb" />
+    <Compile Include="src\Model\ModelConstants.vb" />
+    <Compile Include="src\Model\TableDesign.vb" />
+    <Compile Include="src\Model\DesignLimits.vb" />
+    <Compile Include="src\Model\RobotCatalog.vb" />
+    <Compile Include="src\Model\GripperCatalog.vb" />
+    <Compile Include="src\Model\RobotKinematics.vb" />
+    <Compile Include="src\Ui\Theme.vb" />
+    <Compile Include="src\Ui\ParameterSlider.vb" />
+    <Compile Include="src\Ui\OptionPicker.vb" />
+    <Compile Include="src\Ui\SketchPanel.vb" />
+    <Compile Include="src\Catia\OleMessageFilter.vb" />
+    <Compile Include="src\Catia\CatiaConnector.vb" />
+    <Compile Include="src\Catia\Num.vb" />
+    <Compile Include="src\Catia\MasterParameters.vb" />
+    <Compile Include="src\Catia\ProfileSwitcher.vb" />
+    <Compile Include="src\Catia\AssemblySwap.vb" />
+    <Compile Include="src\Catia\GussetSwitcher.vb" />
+    <Compile Include="src\Catia\ScrewSwitcher.vb" />
+    <Compile Include="src\Catia\ToolSwitcher.vb" />
+    <Compile Include="src\Catia\MechanismRepair.vb" />
+    <Compile Include="src\Catia\AssemblyUpdater.vb" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
+</Project>

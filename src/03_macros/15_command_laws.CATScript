@@ -1,0 +1,77 @@
+' Zakoni komandi DMU mehanizma "Robot" (rekonstrukcija izgubljenog 13_command_laws).
+'
+' Svaka komanda je po dijelovima linearna funkcija vremena kroz kljucne poze
+'   P1 -> P2 -> P3 -> P2 -> P4 -> P5 -> P4 -> P6   (7 dionica po master\sim_leg sekundi)
+' s kutovima iz master\Pn_jk (vidi 14_ik_laws):
+'   Command.1 <- j1,  Command.2 <- j2,  Command.3 <- j3,  Command.5 <- j5,
+'   Command.6 <- j1   (tako je u modelu: J6 slijedi J1),  Command.4 (J4) = bez zakona.
+' Formula za dionicu i:  + ( `Pb_jk` - `Pa_jk` ) * min( max( ( t - i*leg ) / leg , 0 ) , 1 )
+'
+' mode "dry" (default): usporeduje postojece zakone s kanonskim izrazom.
+' mode "fix":           ispravlja razlicite (postojece formule, ime se zadrzava).
+' Argument j6: "j1" (default, kao u modelu) ili "none" - tada se zakon za Command.6
+' samo prijavljuje, ne dira.
+Function Norm(x)
+Norm = Replace(Replace(Replace(x, " ", ""), vbCr, ""), vbLf, "")
+End Function
+
+Function Law(jk)
+Dim fr, i, e
+fr = Array("P1", "P2", "P3", "P2", "P4", "P5", "P4", "P6")
+e = "`master\" & fr(0) & "_" & jk & "`"
+For i = 0 To 6
+ e = e & " + ( `master\" & fr(i + 1) & "_" & jk & "` - `master\" & fr(i) & "_" & jk & "` ) * min( max( ( `Robot\KINTime` / 1s - " & i & " * `master\sim_leg` ) / `master\sim_leg` , 0 ) , 1 )"
+Next
+Law = e
+End Function
+
+Function CATMain(mode, j6)
+Dim root, rels, s, i, r, o, cmd, jk, want, found, nDiff, nFix
+On Error Resume Next
+If mode = "" Then mode = "dry"
+If j6 = "" Then j6 = "j1"
+Set root = CATIA.Documents.Item("robot_mainAssembly.CATProduct").Product
+If Err.Number <> 0 Then CATMain = "robot_mainAssembly nije otvoren" : Exit Function
+Set rels = root.Relations
+nDiff = 0 : nFix = 0
+For Each cmd In Array("1:j1", "2:j2", "3:j3", "5:j5", "6:" & j6)
+ jk = Split(cmd, ":")(1)
+ found = False
+ For i = 1 To rels.Count
+  Set r = rels.Item(i)
+  Err.Clear
+  o = r.GetOutParameter(1).Name
+  If Err.Number = 0 And InStr(o, "Robot\Commands\Command." & Split(cmd, ":")(0) & "\") > 0 Then
+   found = True
+   If jk = "none" Then
+    s = s & "Command." & Split(cmd, ":")(0) & ": " & r.Name & " (ne diram)" & vbLf
+   Else
+    want = Law(jk)
+    If Norm(r.Value) = Norm(want) Then
+     s = s & "Command." & Split(cmd, ":")(0) & " <- " & jk & ": " & r.Name & " OK" & vbLf
+    Else
+     nDiff = nDiff + 1
+     s = s & "Command." & Split(cmd, ":")(0) & " <- " & jk & ": " & r.Name & " RAZLICITO" & vbLf & "   ima:  " & r.Value & vbLf
+     If mode = "fix" Then
+      r.Modify want
+      If Err.Number <> 0 Then
+       s = s & "   MODIFY ERR " & Err.Description & vbLf
+       Err.Clear
+      Else
+       nFix = nFix + 1
+      End If
+     End If
+    End If
+   End If
+  End If
+ Next
+ Err.Clear
+ If Not found Then s = s & "Command." & Split(cmd, ":")(0) & ": NEMA zakona (kreirati rucno: DMU > Simulation with Laws > Formula na Command." & Split(cmd, ":")(0) & ", izraz iz Law(""" & jk & """))" & vbLf
+Next
+' mrtve formule (npr. sim_* s `deleted_TIME`)
+For i = 1 To rels.Count
+ If InStr(rels.Item(i).Value, "deleted_") > 0 Then s = s & "   mrtva formula (deleted_*): " & rels.Item(i).Name & vbLf
+Next
+s = s & "mode=" & mode & "  razlicito=" & nDiff & "  ispravljeno=" & nFix & vbLf
+CATMain = s
+End Function
