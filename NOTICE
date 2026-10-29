@@ -1,0 +1,18 @@
+ROMS: parametric robot table (CATIA V5 + VB.NET)
+Copyright 2026 Krešimir Hartl
+
+This repository contains CAD models of commercial products. They are the manufacturers' data,
+included only so that the assembly opens and can be checked. All rights to these models and to the
+product names remain with the manufacturers. They are not covered by this repository's own work.
+
+Folder                      Products                                              Manufacturer
+src/01_cad/03_bosch         Aluminium profile accessories: gussets, foundation     Bosch Rexroth
+                            bracket, leveling foot, damping ring, T-nut,
+                            T-head bolts, anchor bolt, collar nut
+src/01_cad/05_robot         LR Mate 200iC industrial robot (link geometry)         FANUC
+src/01_cad/07_schunk        MPG-plus 40 and EGP 64 grippers                       SCHUNK
+src/01_cad/04_fasteners     Standard fasteners to DIN 125, DIN 6325, DIN 7991       standard parts
+
+The original work in this repository is the parametric master part and its rules, the table
+assembly built from the profiles, the robot kinematics and formulas, the tool assemblies, the
+RomsCatiaUI application (src/02_vb) and the CATIA macros (src/03_macros).
