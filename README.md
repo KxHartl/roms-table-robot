@@ -61,3 +61,7 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 
 **Move CAD files only through CATIA** (Save As, or the `30_reorganize_tree` macro), never in
 Explorer: the assemblies remember the paths of their parts.
+
+## License
+
+[Apache-2.0](LICENSE) for the author's own work. The manufacturers' CAD models are listed in [NOTICE](NOTICE) and stay with their owners.
